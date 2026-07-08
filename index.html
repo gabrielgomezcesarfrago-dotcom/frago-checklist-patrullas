@@ -184,7 +184,7 @@
 
 </div>
 
-<div class="footer" id="footer"><span id="footer-txt">FRAGO Seguridad Privada · Control de Flotilla</span><br><button id="footer-login" style="background:none;border:none;color:var(--gold-light);font-size:12px;cursor:pointer;margin-top:6px;text-decoration:underline;">🔒 Iniciar sesión (coordinadores)</button><br><span style="font-size:10px;color:#4a5a70;">versión 2.1 · JSONP</span></div>
+<div class="footer" id="footer"><span id="footer-txt">FRAGO Seguridad Privada · Control de Flotilla</span><br><button id="footer-login" style="background:none;border:none;color:var(--gold-light);font-size:12px;cursor:pointer;margin-top:6px;text-decoration:underline;">🔒 Iniciar sesión (coordinadores)</button><br><span style="font-size:10px;color:#4a5a70;">versión 2.3 · login en servidor</span></div>
 <div class="overlay" id="overlay"><div class="spin"></div><div class="otxt" id="otxt">Generando PDF...</div></div>
 
 <script>
@@ -194,7 +194,7 @@ function jsonpGet(params){
   return new Promise((resolve,reject)=>{
     const cb='cb_'+Date.now()+'_'+Math.floor(Math.random()*100000);
     const s=document.createElement('script');
-    const to=setTimeout(()=>{ limpiar(); reject(new Error('timeout')); }, 15000);
+    const to=setTimeout(()=>{ limpiar(); reject(new Error('timeout')); }, 30000);
     function limpiar(){ clearTimeout(to); try{ delete window[cb]; }catch(e){ window[cb]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
     window[cb]=function(data){ limpiar(); resolve(data); };
     s.onerror=()=>{ limpiar(); reject(new Error('network')); };
@@ -507,9 +507,9 @@ async function loginMensual(){
   if(!u||!p){err.textContent='Escribe usuario y contraseña';err.classList.add('show');return;}
   const btn=document.getElementById('m-login-btn'); btn.disabled=true; btn.textContent='Verificando...';
   try{ const r=await jsonpGet({action:'login',usuario:u,password:p});
-    if(r.status==='ok'){ mensualAutorizado=true; document.getElementById('login-box').style.display='none'; document.getElementById('login-ok').style.display='block'; }
+    if(r && r.status==='ok'){ mensualAutorizado=true; document.getElementById('login-box').style.display='none'; document.getElementById('login-ok').style.display='block'; }
     else{ err.textContent='Usuario o contraseña incorrectos'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
-  }catch(e){ err.textContent='Error de conexión.'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
+  }catch(e){ err.textContent='No se pudo verificar. Revisa tu conexión.'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
 }
 function totalMant(){ return nivelesMant().reduce((s,n)=>s+MANT[tipoSel][n].length,0); }
 function respMant(){ let n=0; nivelesMant().forEach(nv=>MANT[tipoSel][nv].forEach((_,i)=>{ if(opts[nv+'_'+i])n++; })); return n; }
@@ -694,14 +694,14 @@ async function loginDirectivo(){
   const btn=document.getElementById('login-btn'); btn.disabled=true; btn.textContent='Verificando...';
   try{
     const r=await jsonpGet({action:'login_directivo',usuario:u,password:p});
-    if(r.status==='ok'){
+    if(r && r.status==='ok'){
       try{ localStorage.setItem('frago_sesion',JSON.stringify({usuario:u,nombre:r.nombre,rol:r.rol})); localStorage.removeItem('frago_rol_elegido'); }catch(e){}
       aplicarRolTag('coordinador');
       if(PUSH_ACTIVO) pedirPermisoPush();
       actualizarSesionUI(); btn.disabled=false; btn.textContent='Iniciar sesión'; document.getElementById('login-pass').value='';
       continuarFlujo();
     } else { err.textContent='Usuario o contraseña incorrectos'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
-  }catch(e){ err.textContent='Error de conexión. Intenta de nuevo.'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
+  }catch(e){ err.textContent='No se pudo verificar. Revisa tu conexión e intenta de nuevo.'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
 }
 function logout(){ try{ localStorage.removeItem('frago_sesion'); localStorage.removeItem('frago_rol_elegido'); }catch(e){} aplicarRolTag('jefe'); actualizarSesionUI(); mostrar('s-login'); }
 function actualizarSesionUI(){
