@@ -59,6 +59,9 @@
   .opt.s-revisar,.opt.s-atencion{background:#FEF6E0;border-color:#C9A84C;color:#7A6020;}
   .opt.s-no,.opt.s-mal{background:var(--fail-bg);border-color:var(--fail);color:var(--fail);}
   .det{display:none;margin-top:8px;}.det.show{display:block;}.det textarea{min-height:46px;font-size:13px;border-color:rgba(201,168,76,.35);}
+  .ptfoto{margin-top:8px;}
+  .ptfoto-btn{background:rgba(255,255,255,.04);border:1px dashed rgba(201,168,76,.35);border-radius:var(--radius-sm);color:var(--gold-light);font-size:11px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:inherit;}
+  .ptfoto-btn:active{opacity:.7;}
   .cli{background:rgba(255,255,255,.03);border-radius:var(--radius-sm);padding:11px;margin-bottom:9px;border:1px solid rgba(255,255,255,.05);}
   .cli-l{font-size:13px;font-weight:600;margin-bottom:8px;}
   .nivel{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;}
@@ -154,17 +157,36 @@
   <!-- Formulario mantenimiento -->
   <div class="screen" id="s-mant">
     <button class="back" onclick="mostrar('s-accion')">← Volver</button>
-    <div class="seg c3" id="m-cad"></div>
+    <div class="seg c2" id="m-cad"></div>
     <div id="m-body"></div>
     <div class="err" id="m-err"></div>
     <button class="btn-go" id="m-btn" onclick="enviarMant()"><span>Generar PDF y Enviar</span><span>→</span></button>
     <div class="ok-card" id="m-ok"><div class="ok-i">✅</div><div class="ok-t">Mantenimiento registrado</div><div class="ok-s" id="m-ok-s"></div>
       <button class="btn-sm" style="margin-top:14px;border-color:var(--ok);color:var(--ok);font-weight:600;" onclick="descargarCopia()">⬇ Descargar mi copia (PDF)</button></div>
   </div>
+  <!-- Login de inicio: elegir jefe de turno (sin login) o entrar como coordinador -->
+  <div class="screen" id="s-login">
+    <div style="text-align:center;margin:1.5rem 0;">
+      <div class="badge-unidad" style="font-size:16px;display:inline-block;">FRAGO</div>
+      <div style="font-size:18px;font-weight:700;margin-top:8px;">Control de Flotilla</div>
+    </div>
+    <div class="prompt">¿Cómo vas a entrar?</div>
+    <div class="grid">
+      <div class="card action-card" onclick="entrarJefe()"><div class="icon">👷</div><div><div class="label">Soy jefe de turno</div><div class="meta">Sin iniciar sesión · recibes los recordatorios</div></div></div>
+    </div>
+    <div style="text-align:center;color:var(--gray-400);font-size:12px;margin:16px 0 10px;">— o —</div>
+    <div class="info">Acceso para coordinadores generales y directivos (opcional). Recibe todas las notificaciones y reportes.</div>
+    <div class="step"><div class="step-b">
+      <div class="field"><div class="flabel">Usuario</div><input type="text" id="login-user" autocomplete="username" placeholder="Usuario"></div>
+      <div class="field"><div class="flabel">Contraseña</div><input type="password" id="login-pass" autocomplete="current-password" placeholder="Contraseña"></div>
+      <button class="btn-go" id="login-btn" style="margin-top:4px;" onclick="loginDirectivo()">Iniciar sesión</button>
+      <div class="err" id="login-err" style="margin-top:8px;"></div>
+    </div></div>
+  </div>
 
 </div>
 
-<div class="footer" id="footer">FRAGO Seguridad Privada · Control de Flotilla</div>
+<div class="footer" id="footer"><span id="footer-txt">FRAGO Seguridad Privada · Control de Flotilla</span><br><button id="footer-login" style="background:none;border:none;color:var(--gold-light);font-size:12px;cursor:pointer;margin-top:6px;text-decoration:underline;">🔒 Iniciar sesión (coordinadores)</button></div>
 <div class="overlay" id="overlay"><div class="spin"></div><div class="otxt" id="otxt">Generando PDF...</div></div>
 
 <script>
@@ -200,7 +222,8 @@ const DAILY = {
       ['int_danos','Daños interiores',[['ok','✓ Sin daños'],['revisar','⚠ Daño menor'],['no','✕ Daño visible']],1],
       ['luces','Luces',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
       ['frenos','Frenos',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
-      ['sirena','Sirena y torreta',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
+      ['torreta','Torreta',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
+      ['claxon','Claxon',[['ok','✓ Funciona'],['no','✕ No funciona']],0],
       ['radio','Radio de comunicación',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Sin señal']],1],
       ['refaccion','Refacción / llave / gato',[['ok','✓ Completo'],['revisar','⚠ Falta algo'],['no','✕ Incompleto']],1],
       ['documentacion','Documentación vigente',[['ok','✓ Vigente'],['revisar','⚠ Por vencer'],['no','✕ Vencida']],1],
@@ -215,13 +238,14 @@ const DAILY = {
       ['llanta_tras','Llanta trasera',[['ok','✓ Buen estado'],['no','✕ Mal estado']],0],
       ['presion','Presión',[['ok','✓ Correcta'],['revisar','⚠ Baja'],['no','✕ Muy baja']],0],
       ['cadena','Cadena / transmisión',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
-      ['carroceria','¿Golpes o daños nuevos?',[['ok','✓ Sin daños'],['revisar','⚠ Revisar'],['no','✕ Daño nuevo']],1],
+      ['carroceria','Golpes / rayones (nuevos)',[['ok','✓ Sin daños'],['revisar','⚠ Revisar'],['no','✕ Daño nuevo']],1],
       ['espejos','Espejos',[['ok','✓ OK'],['revisar','⚠ Desalineados'],['no','✕ Roto/falta']],0],
       ['cajuela','Cajuela / maletero',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Dañada']],1],
       ['equipo_cajuela','Equipo en cajuela',[['ok','✓ Completo'],['revisar','⚠ Falta algo'],['no','✕ Incompleto']],1],
       ['luces','Luces y direccionales',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
       ['frenos','Frenos',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
       ['claxon','Claxon',[['ok','✓ Funciona'],['no','✕ No funciona']],0],
+      ['acelerador','Acelerador y chicote',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
       ['documentacion','Documentación',[['ok','✓ Vigente'],['revisar','⚠ Por vencer'],['no','✕ Vencida']],1],
       ['testigos','Testigos en tablero',[['ok','✓ Ninguno'],['no','✕ Encendidos']],1],
     ]},
@@ -229,12 +253,12 @@ const DAILY = {
     fotos:[['bateria','Indicador de batería','Pantalla mostrando %'],['estado','Estado físico','Vista general y ruedas']],
     checks:[
       ['en_carga','Conectado a carga al devolver',[['ok','✓ Sí'],['no','✕ No']],0],
-      ['estado_fisico','¿Golpes o daños nuevos?',[['ok','✓ Sin daños'],['revisar','⚠ Revisar'],['no','✕ Daño nuevo']],1],
+      ['estado_fisico','Golpes / rayones (nuevos)',[['ok','✓ Sin daños'],['revisar','⚠ Revisar'],['no','✕ Daño nuevo']],1],
       ['ruedas','Ruedas',[['ok','✓ Buen estado'],['revisar','⚠ Desgaste'],['no','✕ Mal estado']],0],
       ['manubrio','Manubrio y dirección',[['ok','✓ Firme'],['revisar','⚠ Holgura'],['no','✕ Dañado']],1],
       ['deck','Plataforma / deck',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Dañada']],0],
       ['freno','Freno',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ Falla']],1],
-      ['acelerador','Acelerador',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ No responde']],1],
+      ['acelerador','Acelerador y chicote',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ No responde']],1],
       ['luces','Luces',[['ok','✓ OK'],['revisar','⚠ Revisar'],['no','✕ No enciende']],0],
       ['plegado','Mecanismo de plegado',[['ok','✓ Funciona'],['revisar','⚠ Revisar'],['no','✕ Traba']],0],
       ['cable_carga','Cable de carga',[['ok','✓ Está'],['no','✕ No está']],0],
@@ -244,18 +268,15 @@ const DAILY = {
 // ═══ CHECKLISTS MANTENIMIENTO (datos, acumulativo) ═══
 const MANT = {
   patrulla:{
-    semanal:['Presión de llantas (con manómetro)','Nivel de aceite de motor','Nivel de refrigerante','Nivel de líquido de frenos','Nivel de limpiaparabrisas','Batería (bornes y carga)','Luces completas','Limpieza profunda','Documentos vigentes a bordo'],
-    quincenal:['Desgaste de balatas / frenos','Suspensión y amortiguadores','Revisión de fugas','Banda de accesorios','Sirena, torreta y altavoz a fondo','Plumas limpiaparabrisas'],
+    semanal:['Presión de llantas (con manómetro)','Nivel de aceite de motor','Nivel de refrigerante','Nivel de líquido de frenos','Nivel de limpiaparabrisas','Estado de la batería','Luces externas (cuartos, bajas, altas, direccionales)','Luces interiores','Torreta','Claxon','Golpes / rayones','Limpieza profunda','Documentos vigentes a bordo'],
     mensual:['Cambio de aceite y filtro (si toca por km)','Rotación / balanceo de llantas','Filtro de aire','Escaneo de testigos (OBD)','Profundidad de dibujo de llantas','Inventario de equipo de emergencia','Revisión a fondo de carrocería'],
   },
   moto:{
     semanal:['Presión de llantas (con manómetro)','Nivel de aceite de motor','Tensión y lubricación de cadena','Batería','Luces y direccionales','Limpieza general','Documentos vigentes'],
-    quincenal:['Desgaste de balatas / frenos','Suspensión','Revisión de fugas','Estado de cadena y sprockets','Espejos y manubrio'],
     mensual:['Cambio de aceite (si toca por km)','Filtro de aire','Profundidad de dibujo de llantas','Frenos a fondo','Ajuste y torque general','Inventario de equipo en cajuela'],
   },
   monopatin:{
     semanal:['Nivel y salud de batería','Presión / estado de ruedas','Freno','Apriete de manubrio y plegado','Limpieza general'],
-    quincenal:['Tornillería y apriete general','Estado del deck','Cable y puerto de carga','Acelerador y display'],
     mensual:['Batería a fondo (autonomía real)','Desgaste de ruedas','Frenos a fondo','Firmware / app','Revisión estructural completa'],
   },
 };
@@ -302,11 +323,20 @@ function fotoZone(key,label,sub,req,cam){return `<div class="field"><div class="
 function selfieZone(key,label){return `<div class="field"><div class="flabel">${label} <span class="req">*</span> <span class="reqb">OBLIGATORIA</span></div><div class="pz"><input type="file" accept="image/*" capture="user" onchange="addFoto(this,'prev-${key}','${key}')"><div class="icon">🤳</div><div class="l">Toca para tomar selfie</div></div><div class="prev" id="prev-${key}"></div></div>`;}
 function setOpt(el,campo,val){el.parentElement.querySelectorAll('.opt').forEach(b=>b.className='opt');el.classList.add('s-'+val);opts[campo]=val;const d=document.getElementById('det-'+campo);if(d)d.classList.toggle('show',val==='revisar'||val==='no'||val==='atencion'||val==='mal');}
 function setNota(campo,v){notas[campo]=v;}
-function itemHTML(k,label,opciones,detail,prefix){
+function ptFoto(k){
+  return `<div class="ptfoto"><button type="button" class="ptfoto-btn" onclick="document.getElementById('ptf-${k}').click()">📷 Agregar foto (opcional)</button><input type="file" id="ptf-${k}" accept="image/*" capture="environment" multiple style="display:none" onchange="addFoto(this,'ptp-${k}','pt_${k}')"><div class="prev" id="ptp-${k}"></div></div>`;
+}
+function labelPunto(k){
+  const key=k.replace('pt_','');
+  if(accion==='diario'){ const ch=DAILY[tipoSel].checks.find(x=>x[0]===key); return ch?ch[1]:key; }
+  const p=key.split('_'); const nv=p[0], idx=parseInt(p[1]); return (MANT[tipoSel][nv]&&MANT[tipoSel][nv][idx])||key;
+}
+function ptSecs(){ return Object.keys(fotos).filter(k=>k.indexOf('pt_')===0 && fotos[k] && fotos[k].length).map(k=>({k, l:'Punto: '+labelPunto(k)})); }
+function itemHTML(k,label,opciones,detail){
   const cls=opciones.length===2?'o2':'o3';
   const btns=opciones.map(o=>`<div class="opt" onclick="setOpt(this,'${k}','${o[0]}')">${o[1]}</div>`).join('');
   const det=detail?`<div class="det" id="det-${k}"><textarea placeholder="¿Qué encontraste? ¿Qué hay que revisar?" oninput="setNota('${k}',this.value)"></textarea></div>`:'';
-  return `<div class="cli"><div class="cli-l">${label}</div><div class="opts ${cls}">${btns}</div>${det}</div>`;
+  return `<div class="cli"><div class="cli-l">${label}</div><div class="opts ${cls}">${btns}</div>${det}${ptFoto(k)}</div>`;
 }
 // Firma reutilizable
 function initFirma(canvasId){
@@ -414,20 +444,22 @@ function abrirMant(){
   Object.keys(firmas).forEach(k=>delete firmas[k]);
   cadencia='semanal'; mensualAutorizado=false;
   document.getElementById('m-ok').classList.remove('show'); document.getElementById('m-btn').disabled=false; document.getElementById('m-err').classList.remove('show');
-  document.getElementById('m-cad').innerHTML=['semanal','quincenal','mensual'].map((c,i)=>`<button class="seg-btn ${i===0?'active':''}" onclick="setCadencia('${c}',this)">${c.toUpperCase()}</button>`).join('');
+  document.getElementById('m-cad').innerHTML=['semanal','mensual'].map((c,i)=>`<button class="seg-btn ${i===0?'active':''}" onclick="setCadencia('${c}',this)">${c.toUpperCase()}</button>`).join('');
   renderMant(); mostrar('s-mant');
 }
 function setCadencia(c,el){ cadencia=c; document.querySelectorAll('#m-cad .seg-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); renderMant(); }
-function nivelesMant(){ return cadencia==='semanal'?['semanal']:cadencia==='quincenal'?['semanal','quincenal']:['semanal','quincenal','mensual']; }
+function nivelesMant(){ return cadencia==='semanal'?['semanal']:['semanal','mensual']; }
 function renderMant(){
   const esMensual=cadencia==='mensual'; const esMono=tipoSel==='monopatin';
   const cadInfo={semanal:'Revisión semanal. La realizan los jefes de turno.',quincenal:'Revisión quincenal (incluye lo semanal). La realizan los jefes de turno.',mensual:'Revisión mensual (incluye todo). Solo la realiza el Coordinador General.'};
   let h='';
   h+=`<div class="step"><div class="step-h"><div class="step-n">1</div><div class="step-t">Quién realiza la revisión</div></div><div class="step-b"><div class="info">${cadInfo[cadencia]}</div>`;
   h+=`<div class="field"><div class="flabel">Nombre completo <span class="req">*</span></div><input type="text" id="m-nombre" placeholder="Nombre y apellido"></div>`;
+  const ses=sesionGuardada();
+  const userPre=(ses&&ses.rol==='coordinador_general'&&ses.usuario)?ses.usuario:'';
   if(esMensual){
-    h+=`<div class="info" style="background:rgba(160,32,32,.1);border-color:rgba(160,32,32,.3);color:#E88;">Revisión restringida. Inicia sesión como Coordinador General.</div>`
-      +`<div id="login-box"><div class="field"><div class="flabel">Usuario <span class="req">*</span></div><input type="text" id="m-user"></div><div class="field"><div class="flabel">Contraseña <span class="req">*</span></div><input type="password" id="m-pass"></div><button class="btn-go" id="m-login-btn" style="margin-top:4px;" onclick="loginMensual()">Iniciar sesión</button><div class="err" id="m-login-err" style="margin-top:8px;"></div></div>`
+    h+=`<div class="info" style="background:rgba(160,32,32,.1);border-color:rgba(160,32,32,.3);color:#E88;">Revisión restringida a Coordinador General. Confirma tu contraseña.</div>`
+      +`<div id="login-box"><div class="field"><div class="flabel">Usuario <span class="req">*</span></div><input type="text" id="m-user" value="${userPre}"></div><div class="field"><div class="flabel">Contraseña <span class="req">*</span></div><input type="password" id="m-pass"></div><button class="btn-go" id="m-login-btn" style="margin-top:4px;" onclick="loginMensual()">Iniciar sesión</button><div class="err" id="m-login-err" style="margin-top:8px;"></div></div>`
       +`<div id="login-ok" style="display:none;background:var(--ok-bg);border:1.5px solid var(--ok);border-radius:var(--radius-sm);padding:12px;color:var(--ok);font-size:13px;font-weight:600;">✓ Sesión verificada como Coordinador General</div>`;
   } else {
     h+=selfieZone('selfie','Selfie de identificación');
@@ -452,7 +484,7 @@ function renderMant(){
 }
 function itemMant(k,label){
   const opciones=[['ok','✓ OK'],['atencion','⚠ Atención'],['mal','✕ Mal']];
-  return `<div class="cli"><div class="cli-l">${label}</div><div class="opts o3">${opciones.map(o=>`<div class="opt" onclick="setOpt(this,'${k}','${o[0]}')">${o[1]}</div>`).join('')}</div><div class="det" id="det-${k}"><textarea placeholder="¿Qué encontraste?" oninput="setNota('${k}',this.value)"></textarea></div></div>`;
+  return `<div class="cli"><div class="cli-l">${label}</div><div class="opts o3">${opciones.map(o=>`<div class="opt" onclick="setOpt(this,'${k}','${o[0]}')">${o[1]}</div>`).join('')}</div><div class="det" id="det-${k}"><textarea placeholder="Describe qué está mal (obligatorio)" oninput="setNota('${k}',this.value)"></textarea></div>${ptFoto(k)}</div>`;
 }
 async function loginMensual(){
   const u=val('m-user'),p=document.getElementById('m-pass').value; const err=document.getElementById('m-login-err'); err.classList.remove('show');
@@ -472,6 +504,8 @@ function validarMant(){
   else { if(!(fotos.selfie||[]).length)e.push('La selfie es obligatoria'); }
   if(!esMono && !val('m-km'))e.push('Ingresa el kilometraje');
   if(respMant()<totalMant())e.push('Responde todos los puntos ('+respMant()+'/'+totalMant()+')');
+  const sinDesc=[]; nivelesMant().forEach(nv=>MANT[tipoSel][nv].forEach((item,i)=>{const k=nv+'_'+i; if((opts[k]==='atencion'||opts[k]==='mal')&&!(notas[k]&&notas[k].trim()))sinDesc.push(item);}));
+  if(sinDesc.length)e.push('Describe qué está mal en: '+sinDesc[0]);
   if(!firmas.firmaM||!firmas.firmaM.isActive())e.push('Se requiere tu firma');
   return e;
 }
@@ -520,6 +554,7 @@ function generarPDFDiario(){
   if(showB)fotoSecs.push({k:'selfieB',l:esCambio?'Jefe que recibe':'Responsable'});
   cfg.fotos.forEach(f=>fotoSecs.push({k:f[0],l:f[1]}));
   y=pdfFotos(doc,y,fotoSecs);
+  y=pdfFotos(doc,y,ptSecs());
   // firmas
   if(y>240){doc.addPage();y=20;}
   doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(11,31,58);doc.text('Firmas de conformidad',mg,y);y+=4;
@@ -548,6 +583,7 @@ function generarPDFMant(){
     }); y+=4; });
   const obs=val('m-obs'); if(obs){if(y>250){doc.addPage();y=20;}doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(11,31,58);doc.text('Observaciones',mg,y);y+=5;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(50,50,70);const ol=doc.splitTextToSize(obs,cw-4);doc.text(ol,mg+2,y);y+=ol.length*4.5+4;}
   y=pdfFotos(doc,y,[{k:'selfie',l:'Responsable'},{k:'evidencia',l:'Evidencia'}]);
+  y=pdfFotos(doc,y,ptSecs());
   if(firmas.firmaM&&firmas.firmaM.isActive()){ if(y>245){doc.addPage();y=20;} doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(11,31,58);doc.text('Firma del responsable',mg,y);y+=4;try{doc.addImage('data:image/png;base64,'+firmas.firmaM.dataURL(),'PNG',mg,y,75,22);}catch(e){}y+=27;doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(80,80,100);doc.text(nombre,mg,y);}
   pdfFooter(doc,'Mantenimiento '+cadencia+' — '+unidadSel+' — '+new Date().toLocaleDateString('es-MX'));
   return doc;
@@ -605,25 +641,62 @@ async function enviarMant(){
 }
 function descargarCopia(){ if(pdfGuardado)pdfGuardado.save(nombrePdf||'registro.pdf'); }
 
-// ═══ INIT (QR con ?u=) ═══
-(function(){ const raw=new URLSearchParams(location.search).get('u'); if(raw){ const u=unidadPorCodigo(raw); if(u){ tipoSel=u.tipo; unidadSel=u.codigo; document.getElementById('h-sub').textContent='Confirma la unidad y elige qué registrar'; irAccion(); return; } } mostrar('s-tipo'); })();
+// ═══ INIT ═══
+(function(){
+  actualizarSesionUI();
+  const raw=new URLSearchParams(location.search).get('u');
+  if(!yaEligioRol()){ pendingU=raw; mostrar('s-login'); return; } // login de inicio
+  if(raw){ const u=unidadPorCodigo(raw); if(u){ tipoSel=u.tipo; unidadSel=u.codigo; document.getElementById('h-sub').textContent='Confirma la unidad y elige qué registrar'; irAccion(); return; } }
+  mostrar('s-tipo');
+})();
 
 // ═══ PWA: registrar service worker ═══
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
 
-// ═══ PUSH: OneSignal ═══
+// ═══ PUSH: OneSignal + sesión de coordinador ═══
 // Reemplaza ONESIGNAL_APP_ID por el App ID de tu app de OneSignal para Flotilla.
 const ONESIGNAL_APP_ID = 'ONESIGNAL_APP_ID';
+function sesionGuardada(){ try{ return JSON.parse(localStorage.getItem('frago_sesion')||'null'); }catch(e){ return null; } }
+function yaEligioRol(){ if(sesionGuardada())return true; try{ return localStorage.getItem('frago_rol_elegido')==='jefe'; }catch(e){ return false; } }
+function rolActual(){ return sesionGuardada() ? 'coordinador' : 'jefe'; }
+let pendingU=null;
+function continuarFlujo(){
+  if(pendingU){ const u=unidadPorCodigo(pendingU); pendingU=null; if(u){ tipoSel=u.tipo; unidadSel=u.codigo; document.getElementById('h-sub').textContent='Confirma la unidad y elige qué registrar'; irAccion(); return; } }
+  mostrar('s-tipo');
+}
+function entrarJefe(){ try{ localStorage.setItem('frago_rol_elegido','jefe'); }catch(e){} aplicarRolTag('jefe'); actualizarSesionUI(); continuarFlujo(); }
+function aplicarRolTag(rol){
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal){ try{ if(rol==='coordinador') OneSignal.User.addTag('rol','coordinador'); else OneSignal.User.removeTag('rol'); }catch(e){} });
+}
+function abrirLogin(){ mostrar('s-login'); }
+async function loginDirectivo(){
+  const u=val('login-user'), p=document.getElementById('login-pass').value; const err=document.getElementById('login-err'); err.classList.remove('show');
+  if(!u||!p){ err.textContent='Escribe usuario y contraseña'; err.classList.add('show'); return; }
+  const btn=document.getElementById('login-btn'); btn.disabled=true; btn.textContent='Verificando...';
+  try{
+    const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'login_directivo',usuario:u,password:p})});
+    const r=await res.json();
+    if(r.status==='ok'){
+      try{ localStorage.setItem('frago_sesion',JSON.stringify({usuario:u,nombre:r.nombre,rol:r.rol})); localStorage.removeItem('frago_rol_elegido'); }catch(e){}
+      aplicarRolTag('coordinador');
+      window.OneSignalDeferred=window.OneSignalDeferred||[]; OneSignalDeferred.push(function(OneSignal){ try{ OneSignal.Slidedown.promptPush(); }catch(e){} });
+      actualizarSesionUI(); btn.disabled=false; btn.textContent='Iniciar sesión'; document.getElementById('login-pass').value='';
+      continuarFlujo();
+    } else { err.textContent='Usuario o contraseña incorrectos'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
+  }catch(e){ err.textContent='Error de conexión. Intenta de nuevo.'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
+}
+function logout(){ try{ localStorage.removeItem('frago_sesion'); localStorage.removeItem('frago_rol_elegido'); }catch(e){} aplicarRolTag('jefe'); actualizarSesionUI(); mostrar('s-login'); }
+function actualizarSesionUI(){
+  const s=sesionGuardada(), fl=document.getElementById('footer-login'), ft=document.getElementById('footer-txt');
+  if(s){ ft.innerHTML='Sesión: <b>'+s.nombre+'</b>'; fl.textContent='Cerrar sesión'; fl.onclick=logout; }
+  else { ft.textContent='FRAGO Seguridad Privada · Control de Flotilla'; fl.textContent='🔒 Iniciar sesión (coordinadores)'; fl.onclick=abrirLogin; }
+}
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal){
   if(ONESIGNAL_APP_ID === 'ONESIGNAL_APP_ID') return; // aún no configurado
-  await OneSignal.init({
-    appId: ONESIGNAL_APP_ID,
-    serviceWorkerParam: { scope: '/' },
-    serviceWorkerPath: 'sw.js',
-    allowLocalhostAsSecureOrigin: true,
-  });
-  // Pide permiso de notificaciones de forma suave
+  await OneSignal.init({ appId: ONESIGNAL_APP_ID, serviceWorkerParam: { scope: '/' }, serviceWorkerPath: 'sw.js', allowLocalhostAsSecureOrigin: true });
+  aplicarRolTag(rolActual()); // reaplica según haya sesión o no
   OneSignal.Slidedown.promptPush();
 });
 </script>
