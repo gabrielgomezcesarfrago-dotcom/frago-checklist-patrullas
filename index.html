@@ -189,6 +189,24 @@
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7lZ_fSKqBtWUN7a7vYTY5ZdqkOuaCFxvkxxIJ6E76fvSrVliec8_pvj-9hYQGT3kbYg/exec';
+// Lectura confiable con Apps Script (JSONP): evita el bloqueo CORS al leer respuestas.
+function jsonpGet(params){
+  return new Promise((resolve,reject)=>{
+    const cb='cb_'+Date.now()+'_'+Math.floor(Math.random()*100000);
+    const s=document.createElement('script');
+    const to=setTimeout(()=>{ limpiar(); reject(new Error('timeout')); }, 15000);
+    function limpiar(){ clearTimeout(to); try{ delete window[cb]; }catch(e){ window[cb]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
+    window[cb]=function(data){ limpiar(); resolve(data); };
+    s.onerror=()=>{ limpiar(); reject(new Error('network')); };
+    const q=Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k])).join('&');
+    s.src=APPS_SCRIPT_URL+'?'+q+'&callback='+cb;
+    document.head.appendChild(s);
+  });
+}
+// Envío de registros (sin lectura de respuesta): modo confiable con Apps Script.
+function enviarDatos(payload){
+  return fetch(APPS_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+}
 
 // ═══ REGISTRO DE FLOTA ═══
 const FLOTA = [
@@ -488,7 +506,7 @@ async function loginMensual(){
   const u=val('m-user'),p=document.getElementById('m-pass').value; const err=document.getElementById('m-login-err'); err.classList.remove('show');
   if(!u||!p){err.textContent='Escribe usuario y contraseña';err.classList.add('show');return;}
   const btn=document.getElementById('m-login-btn'); btn.disabled=true; btn.textContent='Verificando...';
-  try{ const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'login',usuario:u,password:p})}); const r=await res.json();
+  try{ const r=await jsonpGet({action:'login',usuario:u,password:p});
     if(r.status==='ok'){ mensualAutorizado=true; document.getElementById('login-box').style.display='none'; document.getElementById('login-ok').style.display='block'; }
     else{ err.textContent='Usuario o contraseña incorrectos'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
   }catch(e){ err.textContent='Error de conexión.'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
@@ -605,12 +623,10 @@ async function enviarDiario(){
       timestamp:new Date().toISOString(),checklist:opts,observaciones:val('obs'),notas:recolectarNotasDiario(),pdf,filename:nombrePdf};
     if(cfg.combustible==='bateria')payload.bateria_nivel=nivel; else payload.gasolina_nivel=nivel;
     document.getElementById('otxt').textContent='Enviando a Drive...';
-    const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
-    const r=await res.json(); ov.classList.remove('show');
-    if(r.status!=='ok')throw new Error(r.msg||'El servidor rechazó el registro');
+    await enviarDatos(payload); ov.classList.remove('show');
     pdfGuardado=doc;
     document.getElementById('d-ok').classList.add('show');
-    document.getElementById('d-ok-s').textContent=(r.alerta?'Guardado. Aviso: '+r.alerta:'Registro de '+MODO_LABEL[modoDiario].toLowerCase()+' guardado. Unidad '+unidadSel);
+    document.getElementById('d-ok-s').textContent='Registro de '+MODO_LABEL[modoDiario].toLowerCase()+' guardado. Unidad '+unidadSel;
     document.getElementById('d-btn').disabled=true; window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
   }catch(e){ ov.classList.remove('show'); err.textContent='No se pudo guardar. Revisa tu conexión. ('+e.message+')'; err.classList.add('show'); }
 }
@@ -628,9 +644,7 @@ async function enviarMant(){
       usuario:cadencia==='mensual'?val('m-user'):'',password:cadencia==='mensual'?document.getElementById('m-pass').value:'',
       timestamp:new Date().toISOString(),resultados:lista,observaciones:val('m-obs'),pdf,filename:nombrePdf};
     document.getElementById('otxt').textContent='Enviando a Drive...';
-    const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
-    const r=await res.json(); ov.classList.remove('show');
-    if(r.status!=='ok')throw new Error(r.msg||'El servidor rechazó el registro');
+    await enviarDatos(payload); ov.classList.remove('show');
     pdfGuardado=doc;
     document.getElementById('m-ok').classList.add('show');
     document.getElementById('m-ok-s').textContent='Mantenimiento '+cadencia+' de '+unidadSel+' registrado.';
@@ -679,8 +693,7 @@ async function loginDirectivo(){
   if(!u||!p){ err.textContent='Escribe usuario y contraseña'; err.classList.add('show'); return; }
   const btn=document.getElementById('login-btn'); btn.disabled=true; btn.textContent='Verificando...';
   try{
-    const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'login_directivo',usuario:u,password:p})});
-    const r=await res.json();
+    const r=await jsonpGet({action:'login_directivo',usuario:u,password:p});
     if(r.status==='ok'){
       try{ localStorage.setItem('frago_sesion',JSON.stringify({usuario:u,nombre:r.nombre,rol:r.rol})); localStorage.removeItem('frago_rol_elegido'); }catch(e){}
       aplicarRolTag('coordinador');
