@@ -4,14 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Control de Flotilla — FRAGO</title>
-<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0B1F3A">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Flotilla FRAGO">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <style>
   :root{--navy:#0B1F3A;--navy-mid:#152D52;--gold:#C9A84C;--gold-light:#E8C76A;--teal:#0F6E56;
     --ok:#1A7A4A;--ok-bg:#E6F5EE;--warn:#C75000;--fail:#A02020;--fail-bg:#FAEAEA;--gray-400:#9898A8;--white:#FFF;
@@ -650,12 +648,17 @@ function descargarCopia(){ if(pdfGuardado)pdfGuardado.save(nombrePdf||'registro.
   mostrar('s-tipo');
 })();
 
-// ═══ PWA: registrar service worker ═══
-if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
-
-// ═══ PUSH: OneSignal + sesión de coordinador ═══
-// Reemplaza ONESIGNAL_APP_ID por el App ID de tu app de OneSignal para Flotilla.
+// ═══ Sesión y (opcionalmente) notificaciones push ═══
+// Para activar push más adelante: pon aquí el App ID de tu app de OneSignal.
 const ONESIGNAL_APP_ID = 'ONESIGNAL_APP_ID';
+const PUSH_ACTIVO = (ONESIGNAL_APP_ID !== 'ONESIGNAL_APP_ID');
+
+// Sin push configurado: limpiar service worker y caché viejos.
+// Esto arregla que la app se trabe o muestre versiones viejas.
+if(!PUSH_ACTIVO){
+  try{ if('serviceWorker' in navigator){ navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); } }catch(e){}
+  try{ if(window.caches){ caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{}); } }catch(e){}
+}
 function sesionGuardada(){ try{ return JSON.parse(localStorage.getItem('frago_sesion')||'null'); }catch(e){ return null; } }
 function yaEligioRol(){ if(sesionGuardada())return true; try{ return localStorage.getItem('frago_rol_elegido')==='jefe'; }catch(e){ return false; } }
 function rolActual(){ return sesionGuardada() ? 'coordinador' : 'jefe'; }
@@ -666,6 +669,7 @@ function continuarFlujo(){
 }
 function entrarJefe(){ try{ localStorage.setItem('frago_rol_elegido','jefe'); }catch(e){} aplicarRolTag('jefe'); actualizarSesionUI(); continuarFlujo(); }
 function aplicarRolTag(rol){
+  if(!PUSH_ACTIVO) return;
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(function(OneSignal){ try{ if(rol==='coordinador') OneSignal.User.addTag('rol','coordinador'); else OneSignal.User.removeTag('rol'); }catch(e){} });
 }
@@ -680,7 +684,7 @@ async function loginDirectivo(){
     if(r.status==='ok'){
       try{ localStorage.setItem('frago_sesion',JSON.stringify({usuario:u,nombre:r.nombre,rol:r.rol})); localStorage.removeItem('frago_rol_elegido'); }catch(e){}
       aplicarRolTag('coordinador');
-      window.OneSignalDeferred=window.OneSignalDeferred||[]; OneSignalDeferred.push(function(OneSignal){ try{ OneSignal.Slidedown.promptPush(); }catch(e){} });
+      if(PUSH_ACTIVO) pedirPermisoPush();
       actualizarSesionUI(); btn.disabled=false; btn.textContent='Iniciar sesión'; document.getElementById('login-pass').value='';
       continuarFlujo();
     } else { err.textContent='Usuario o contraseña incorrectos'; err.classList.add('show'); btn.disabled=false; btn.textContent='Iniciar sesión'; }
@@ -692,13 +696,18 @@ function actualizarSesionUI(){
   if(s){ ft.innerHTML='Sesión: <b>'+s.nombre+'</b>'; fl.textContent='Cerrar sesión'; fl.onclick=logout; }
   else { ft.textContent='FRAGO Seguridad Privada · Control de Flotilla'; fl.textContent='🔒 Iniciar sesión (coordinadores)'; fl.onclick=abrirLogin; }
 }
-window.OneSignalDeferred = window.OneSignalDeferred || [];
-OneSignalDeferred.push(async function(OneSignal){
-  if(ONESIGNAL_APP_ID === 'ONESIGNAL_APP_ID') return; // aún no configurado
-  await OneSignal.init({ appId: ONESIGNAL_APP_ID, serviceWorkerParam: { scope: '/' }, serviceWorkerPath: 'sw.js', allowLocalhostAsSecureOrigin: true });
-  aplicarRolTag(rolActual()); // reaplica según haya sesión o no
-  OneSignal.Slidedown.promptPush();
-});
+function pedirPermisoPush(){ window.OneSignalDeferred=window.OneSignalDeferred||[]; OneSignalDeferred.push(function(OneSignal){ try{ OneSignal.Slidedown.promptPush(); }catch(e){} }); }
+// Solo si OneSignal está configurado: cargar SDK + service worker y activar push.
+if(PUSH_ACTIVO){
+  if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
+  const os=document.createElement('script'); os.src='https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'; os.defer=true; document.head.appendChild(os);
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal){
+    await OneSignal.init({ appId: ONESIGNAL_APP_ID, serviceWorkerParam:{scope:'/'}, serviceWorkerPath:'sw.js', allowLocalhostAsSecureOrigin:true });
+    aplicarRolTag(rolActual());
+    OneSignal.Slidedown.promptPush();
+  });
+}
 </script>
 </body>
 </html>
