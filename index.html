@@ -207,9 +207,9 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7lZ_fSKqBtWUN
 // La contraseña real NUNCA está en el código; solo su huella (hash), que es de una sola vía.
 // Genera los hashes abriendo la app con ?setup y pégalos aquí.
 const CRED_HASH = [
-  { usuario:'gabriel',  hash:'PON_AQUI_EL_HASH_DE_GABRIEL',  nombre:'Gabriel Gómezcésar',  rol:'coordinador_general' },
-  { usuario:'emiliano', hash:'PON_AQUI_EL_HASH_DE_EMILIANO', nombre:'Emiliano Gómezcésar', rol:'coordinador_general' },
-  { usuario:'othon',    hash:'PON_AQUI_EL_HASH_DE_OTHON',    nombre:'Othón Gómezcésar',    rol:'director' },
+  { usuario:'gabriel',  hash:'01ec60934ad29faecb0812ce9141e1fd4f86a54592eb025fa55a614512400c9d',  nombre:'Gabriel Gómezcésar',  rol:'coordinador_general' },
+  { usuario:'emiliano', hash:'01ec60934ad29faecb0812ce9141e1fd4f86a54592eb025fa55a614512400c9d', nombre:'Emiliano Gómezcésar', rol:'coordinador_general' },
+  { usuario:'othon',    hash:'01ec60934ad29faecb0812ce9141e1fd4f86a54592eb025fa55a614512400c9d',    nombre:'Othón Gómezcésar',    rol:'director' },
 ];
 async function sha256(str){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
